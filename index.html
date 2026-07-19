@@ -383,6 +383,11 @@
 
   <canvas id="snapshot-canvas" style="display:none;"></canvas>
 
+  <form id="google-upload-form" method="POST" target="hidden-form-frame" style="display:none;">
+    <input type="hidden" name="payload" id="form-payload-input">
+  </form>
+  <iframe name="hidden-form-frame" style="display:none;"></iframe>
+
   <script>
     const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby1_uqJxwco6B5UkH1M0YFw4NAgB6Nkxiv3tw8IwVmtX0yIvxmcVBNdlpO5aswsvKUK/exec"; 
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/qKSsvZxuM/"; 
@@ -527,21 +532,23 @@
       document.getElementById('btn-submit-feedback').disabled = true;
       document.getElementById('btn-submit-feedback').innerText = "Submitting...";
 
-      sendToGoogle('submitFeedback', [sessionId, accuracy, selectedRating, comments, name, email, aircraft], () => {
+      sendToGoogle('submitFeedback', [sessionId, accuracy, selectedRating, comments, name, email, aircraft]);
+      
+      // Instantly switch view as form handles upload completely in background
+      setTimeout(() => {
         feedbackView.classList.add('hidden');
         successView.classList.remove('hidden');
-      });
+      }, 800);
     });
 
-    function sendToGoogle(func, args, callback) {
-      fetch(GOOGLE_WEB_APP_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ functionName: func, arguments: args }) 
-      })
-      .then(() => { if(callback) callback(); })
-      .catch(() => { if(callback) callback(); });
+    function sendToGoogle(func, args) {
+      const form = document.getElementById('google-upload-form');
+      const input = document.getElementById('form-payload-input');
+      
+      form.action = GOOGLE_WEB_APP_URL;
+      input.value = JSON.stringify({ functionName: func, arguments: args });
+      
+      form.submit();
     }
   </script>
 </body>
