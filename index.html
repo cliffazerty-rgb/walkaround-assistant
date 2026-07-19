@@ -385,7 +385,7 @@
 
   <script>
     // CRITICAL: Replace this string with your deployed Google Web App URL 
-    const GOOGLE_WEB_APP_URL = "PASTE_YOUR_GOOGLE_EXEC_URL_HERE"; 
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby1_uqJxwco6B5UkH1M0YFw4NAgB6Nkxiv3tw8IwVmtX0yIvxmcVBNdlpO5aswsvKUK/exec"; 
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/qKSsvZxuM/"; 
 
     let model, webcamStream, sessionId;
@@ -539,8 +539,17 @@
       fetch(GOOGLE_WEB_APP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ functionName: func, arguments: args })
-      }).then(() => { if(callback) callback(); }).catch(() => { if(callback) callback(); });
+        // CRITICAL FIX: Ensure it passes "arguments" to match your Code.gs script
+        body: JSON.stringify({ functionName: func, arguments: args }) 
+      })
+      .then(response => response.json())
+      .then(data => { 
+        if(callback) callback(); 
+      })
+      .catch(err => { 
+        console.error("Transmission failed:", err);
+        if(callback) callback(); 
+      });
     }
   </script>
 </body>
