@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AI Pre-Flight Walkaround Assistant</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  
+  <style>
+    :root {
+      --primary-dark: #101826;
+      --primary-blue: #2B8CFF;
+      --background: #F5F7FB;
+      --success: #27AE60;
+      --warning: #FFB347;
+      --accent: #EA4C89;
+      --btn-blue-bg: #EAF3FF;
+      --btn-blue-text: #2B8CFF;
+      --btn-green-bg: #EAF8F0;
+      --btn-green-text: #27AE60;
+      --btn-orange-bg: #FFF7EC;
+      --btn-orange-text: #FFB347;
+      --btn-accent-bg: #FDE8F0;
+      --btn-accent-text: #EA4C89;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    body, html { background-color: var(--background); color: var(--primary-dark); width: 100vw; height: 100vh; overflow-x: hidden; }
+    body { display: flex; flex-direction: column; align-items: center; padding: 10px; }
+    header { background-color: var(--primary-dark); color: white; width: 100%; max-width: 500px; padding: 12px; border-radius: 10px; text-align: center; margin-bottom: 10px; flex-shrink: 0; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .card { background: white; width: 100%; max-width: 500px; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; align-items: center; text-align: center; }
+    #welcome-view, #feedback-view { margin-top: auto; margin-bottom: auto; }
+    #scan-view { width: 100%; max-width: 500px; display: none; flex-direction: column; }
+    #camera-container { position: relative; width: 100%; height: 68svh; border-radius: 16px; overflow: hidden; border: 6px solid var(--primary-blue); background-color: #000; flex-shrink: 0; }
+    #webcam { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+    #control-deck { width: 100%; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-blue { background-color: var(--btn-blue-bg); color: var(--btn-blue-text); }
+    .btn-accent { background-color: var(--btn-accent-bg); color: var(--btn-accent-text); }
+    #status-banner { width: 100%; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; text-align: center; }
+    .strobe-alert { animation: pulse-danger 0.8s infinite alternate !important; }
+    @keyframes pulse-danger { 0% { background-color: var(--btn-orange-bg); color: var(--btn-orange-text); } 100% { background-color: #FFD29D; color: #B35F00; } }
+    .form-group { width: 100%; text-align: left; margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1.5px solid #E0E4EC; border-radius: 8px; background-color: var(--background); font-size: 0.9rem; }
+    .rating-container { display: flex; justify-content: space-between; width: 100%; }
+    .rating-box { flex: 1; margin: 0 3px; padding: 8px; border: 1.5px solid #E0E4EC; border-radius: 8px; cursor: pointer; font-weight: 600; background: white; text-align: center; }
+    .rating-box.selected { background-color: var(--btn-accent-bg); border-color: var(--accent); color: var(--accent); }
+    .radio-group { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .radio-label { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1.5px solid #E0E4EC; border-radius: 8px; cursor: pointer; background: white; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <header><h1>AI Pre-Flight Walkaround Assistant</h1></header>
+
+  <div id="welcome-view" class="card">
+    <div style="font-size: 3rem; margin-bottom: 15px;">🔍</div>
+    <h2>Tire Integrity Advisory</h2>
+    <p style="color: #606A7B; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.4;">Scan landing gear assemblies using native machine vision pipelines.</p>
+    <button class="btn btn-accent" id="btn-start-session">Start Check Session</button>
+  </div>
+
+  <div id="scan-view">
+    <div id="camera-container">
+      <video id="webcam" autoplay playsinline muted></video>
+    </div>
+    <div id="control-deck">
+      <div id="status-banner">Initializing System...</div>
+      <button class="btn btn-blue" id="btn-finish-scan">Finish Walkaround</button>
+    </div>
+  </div>
+
+  <div id="feedback-view" class="card hidden">
+    <h2>Walkaround Finished</h2>
+    <div class="form-group"><label>Name</label><input type="text" id="pilot-name"></div>
+    <div class="form-group"><label>E-mail</label><input type="email" id="pilot-email"></div>
+    <div class="form-group"><label>Aircraft</label><input type="text" id="aircraft-model"></div>
+    <div class="form-group">
+      <label>Accurate Identification?</label>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="ai-accuracy" value="Yes"> Yes</label>
+        <label class="radio-label"><input type="radio" name="ai-accuracy" value="No"> No</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Pre-Flight Utility Rating</label>
+      <div class="rating-container">
+        <div class="rating-box" data-val="1">1</div><div class="rating-box" data-val="2">2</div><div class="rating-box" data-val="3">3</div><div class="rating-box" data-val="4">4</div><div class="rating-box" data-val="5">5</div>
+      </div>
+    </div>
+    <div class="form-group"><label>Future Targets?</label><textarea id="future-features" rows="2"></textarea></div>
+    <button class="btn btn-accent" id="btn-submit-feedback">Submit Feedback</button>
+  </div>
+
+  <div id="success-view" class="card hidden">
+    <div style="font-size: 3.5rem; color: var(--success); margin-bottom: 15px;">✓</div>
+    <h2>Submission Complete</h2>
+  </div>
+
+  <canvas id="snapshot-canvas" style="display:none;"></canvas>
+
+  <script>
+    // CRITICAL: Paste your deployed Google Web App URL here
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby1_uqJxwco6B5UkH1M0YFw4NAgB6Nkxiv3tw8IwVmtX0yIvxmcVBNdlpO5aswsvKUK/exec"; 
+    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/qKSsvZxuM/"; 
+
+    let model, webcamStream, sessionId, isDetecting = false, selectedRating = null, onCooldown = false;
+
+    const welcomeView = document.getElementById('welcome-view');
+    const scanView = document.getElementById('scan-view');
+    const feedbackView = document.getElementById('feedback-view');
+    const successView = document.getElementById('success-view');
+    const cameraContainer = document.getElementById('camera-container');
+    const statusBanner = document.getElementById('status-banner');
+    const videoElement = document.getElementById('webcam');
+
+    document.getElementById('btn-start-session').addEventListener('click', async () => {
+      welcomeView.classList.add('hidden');
+      scanView.style.display = 'flex'; 
+      sessionId = "Session_" + Math.random().toString(36).substring(2, 11).toUpperCase();
+      await setupWebcam();
+      await loadAiModel();
+    });
+
+    async function setupWebcam() {
+      try {
+        let stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: 640, height: 480 }, audio: false });
+        webcamStream = stream;
+        videoElement.srcObject = stream;
+        videoElement.play();
+      } catch (err) {
+        alert("Camera blocked. Please allow browser camera access: " + err.message);
+      }
+    }
+
+    async function loadAiModel() {
+      statusBanner.innerText = "Loading AI Core...";
+      try {
+        model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+        resetToSafeState();
+        isDetecting = true;
+        window.requestAnimationFrame(loop);
+      } catch (e) {
+        statusBanner.innerText = "Model Load Error";
+      }
+    }
+
+    async function loop() { if (isDetecting) { await predict(); window.requestAnimationFrame(loop); } }
+
+    async function predict() {
+      if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA && model) {
+        const prediction = await model.predict(videoElement);
+        let highestPred = { className: "", probability: 0 };
+        for (let i = 0; i < prediction.length; i++) {
+          if (prediction[i].probability > highestPred.probability) highestPred = prediction[i];
+        }
+        const isWornClass = highestPred.className.toLowerCase().includes("worn") || highestPred.className === "Needs closer look.";
+        if (isWornClass && highestPred.probability > 0.85) { triggerDefectState(); } else { resetToSafeState(); }
+      }
+    }
+
+    function triggerDefectState() {
+      cameraContainer.style.borderColor = 'var(--warning)';
+      statusBanner.innerText = "⚠️ ATTENTION: Review Surface";
+      statusBanner.classList.add('strobe-alert');
+      if (navigator.vibrate) navigator.vibrate([150, 100, 150]);
+      if (!onCooldown) { onCooldown = true; captureAndSaveDefect(); setTimeout(() => { onCooldown = false; }, 5000); }
+    }
+
+    function resetToSafeState() {
+      cameraContainer.style.borderColor = 'var(--primary-blue)';
+      statusBanner.innerText = "MONITORING: Clear";
+      statusBanner.classList.remove('strobe-alert');
+      statusBanner.style.backgroundColor = 'var(--btn-green-bg)';
+      statusBanner.style.color = 'var(--btn-green-text)';
+    }
+
+    function captureAndSaveDefect() {
+      const canvas = document.getElementById('snapshot-canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+      context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      sendToGoogle('saveDefect', [sessionId, canvas.toDataURL('image/jpeg', 0.7)]);
+    }
+
+    document.getElementById('btn-finish-scan').addEventListener('click', () => {
+      isDetecting = false;
+      if (webcamStream) webcamStream.getTracks().forEach(track => track.stop());
+      scanView.style.display = 'none'; 
+      feedbackView.classList.remove('hidden');
+    });
+
+    document.querySelectorAll('.rating-box').forEach(box => {
+      box.addEventListener('click', function() {
+        document.querySelectorAll('.rating-box').forEach(b => b.classList.remove('selected'));
+        this.classList.add('selected');
+        selectedRating = this.getAttribute('data-val');
+      });
+    });
+
+    document.getElementById('btn-submit-feedback').addEventListener('click', () => {
+      const name = document.getElementById('pilot-name').value;
+      const email = document.getElementById('pilot-email').value;
+      const aircraft = document.getElementById('aircraft-model').value;
+      const accuracyRadio = document.querySelector('input[name="ai-accuracy"]:checked');
+      const accuracy = accuracyRadio ? accuracyRadio.value : "";
+      const comments = document.getElementById('future-features').value;
+
+      document.getElementById('btn-submit-feedback').disabled = true;
+      sendToGoogle('submitFeedback', [sessionId, accuracy, selectedRating, comments, name, email, aircraft], () => {
+        feedbackView.classList.add('hidden');
+        successView.classList.remove('hidden');
+      });
+    });
+
+    function sendToGoogle(func, args, callback) {
+      fetch(GOOGLE_WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ functionName: func, arguments: args })
+      }).then(() => { if(callback) callback(); }).catch(() => { if(callback) callback(); });
+    }
+  </script>
+</body>
+</html>
