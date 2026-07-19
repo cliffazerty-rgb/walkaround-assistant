@@ -384,7 +384,6 @@
   <canvas id="snapshot-canvas" style="display:none;"></canvas>
 
   <script>
-    // CRITICAL: Replace this string with your deployed Google Web App URL 
     const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby1_uqJxwco6B5UkH1M0YFw4NAgB6Nkxiv3tw8IwVmtX0yIvxmcVBNdlpO5aswsvKUK/exec"; 
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/qKSsvZxuM/"; 
 
@@ -472,7 +471,6 @@
       statusBanner.innerText = "⚠️ ATTENTION : Review Requested on Surface";
       statusBanner.classList.add('strobe-alert');
 
-      // Controlled single hardware pulse block
       if (navigator.vibrate && !hasVibratedForCurrentDefect) {
         hasVibratedForCurrentDefect = true; 
         navigator.vibrate([150, 100, 150]); 
@@ -491,7 +489,7 @@
       statusBanner.classList.remove('strobe-alert');
       statusBanner.style.backgroundColor = 'var(--btn-green-bg)';
       statusBanner.style.color = 'var(--btn-green-text)';
-      hasVibratedForCurrentDefect = false; // Arm vibration for the next unique issue spotted
+      hasVibratedForCurrentDefect = false; 
     }
 
     function captureAndSaveDefect() {
@@ -538,18 +536,12 @@
     function sendToGoogle(func, args, callback) {
       fetch(GOOGLE_WEB_APP_URL, {
         method: 'POST',
+        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        // CRITICAL FIX: Ensure it passes "arguments" to match your Code.gs script
         body: JSON.stringify({ functionName: func, arguments: args }) 
       })
-      .then(response => response.json())
-      .then(data => { 
-        if(callback) callback(); 
-      })
-      .catch(err => { 
-        console.error("Transmission failed:", err);
-        if(callback) callback(); 
-      });
+      .then(() => { if(callback) callback(); })
+      .catch(() => { if(callback) callback(); });
     }
   </script>
 </body>
